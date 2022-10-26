@@ -1,0 +1,7 @@
+/run/initialize
+/vis/open ASCIITree
+/vis/ASCIITree/set/outFile geom.txt
+/vis/ASCIITree/verbose 5
+/vis/drawVolume world
+/vis/viewer/refresh
+

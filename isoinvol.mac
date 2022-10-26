@@ -1,0 +1,82 @@
+## macro isoinvol.mac
+## usage: isoinvol.mac <volname> <Z> <A> <nprimaries>
+
+/control/verbose 1
+/run/numberOfThreads 10
+/bgm/output/writeAllEvents false
+
+### define aliases for command-line arguments
+/control/alias VOLUME {ARG1}
+/control/alias Z {ARG2}
+/control/alias A {ARG3}
+/control/alias ISOTOPE {Z}-{A}
+/control/alias NPRIMARIES {ARG4}
+
+### and set the metadata
+/bgm/setMetadata volume {VOLUME}
+/bgm/setMetadata primary isotope
+/bgm/setMetadata isotope {ISOTOPE}
+/bgm/setMetadata nprimaries {NPRIMARIES}
+
+### define the filename
+/bgm/output/filename output/isoinvol_{VOLUME}_{ISOTOPE}
+## append this run's uuid to the filename? 
+/bgm/output/adduuid true
+
+### define the physics list
+## good for em-only stuff
+/physics_lists/factory/set FTFP_BERT
+
+### define optional geometry parameters (none yet)
+
+### need to call this explicitly otherwise /gps tree isn't built
+/run/initialize
+
+### set up the primaries
+/bgm/generator/sampleVolume {VOLUME}
+/gps/particle ion
+/gps/ion {Z} {A}
+/gps/energy 0 MeV
+/gps/ang/type iso
+
+
+### set up readout
+## group output by sensor and decay ancestor
+/bgm/output/addNtuple byiso ancestor copyno
+## for track reconstruction, leave steps enabled
+## false->no steps, smaller files
+/bgm/output/writeSteps false
+/bgm/sensitive/ccd/deepCopyNo true
+
+## disable RDecays and primaries if not needed
+#/hits/inactivate RDecays
+/hits/inactivate Primaries
+
+## comment these if starting far from the CCDs to speed up
+#/physics_lists/setHiresRegion package
+## some of these commands are redundant with the hires command above
+#/process/em/deexcitationIgnoreCut true
+#/process/em/fluo true
+#/process/em/auger true
+#/process/em/augerCascade true
+## pixe can be really slow, watch out:
+#/process/em/pixe true
+#/process/em/deexcitation package 1 1 0
+/process/em/printParameters
+
+
+### enable visualization if wanted
+#/control/execute vis.mac
+#/vis/scene/add/trajectories
+#/vis/scene/add/hits
+## filter tracks if necessary:
+#/vis/filtering/trajectories/create/particleFilter fgammas
+#/vis/filtering/trajectories/fgammas/add gamma
+#/bgm/output/enable false
+
+## progress verbosity
+#/tracking/verbose 2
+/bgm/printProgress 1000
+### run! 
+/run/beamOn {NPRIMARIES}
+

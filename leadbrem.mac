@@ -1,0 +1,104 @@
+## macro leadbrem.mac
+## Usage: leadbrem.mac <nprimaries> [<fname>]
+## Throw bremsstrahlung photons from Pb210 in lead from the inner surface
+
+/control/verbose 1
+/run/numberOfThreads 10
+
+### define aliases for command-line arguments
+/control/alias NPRIMARIES {ARG1}
+/control/aliasDefault ARG2 0
+/control/alias FILENAME {ARG2}
+
+/control/alias SPECTRUM Pb210GammaFluxHist_2inthick.hist
+
+### and set the metadata
+/bgm/setMetadata primary gamma
+/bgm/setMetadata spectrum {SPECTRUM}
+/bgm/setMetadata normalization (3.98+/-0.02)/cm2/s/(Bq/kg)
+## norm from sources/Readme
+
+### define the filename
+/bgm/output/filename output/leadbrem_{FILENAME}
+## append this run's uuid to the filename? 
+/bgm/output/adduuid false
+
+### define the physics list
+## good for em-only stuff
+/physics_lists/factory/set FTFP_BERT
+
+### define the geometry
+/geom/buildDetector cryostat
+/geom/shield/innerShield/addLayer copperShield G4_Cu 1 cm
+/geom/shield/innerShield/addLayer ancientLead G4_Pb  4 cm
+/geom/shield/innerShield/addLayer innerLead G4_Pb 1 um
+/geom/shield/innerShield/printConfig
+
+### initialize geometry and physics
+/run/initialize
+
+### set up the primaries
+## Here we're sampling the inner surface of the ancientLead layer
+## could instead use the "innerLead" layer to estimate passage efficiency
+
+/bgm/generator/sampleVolume p_ancientLeadInside 0 surface
+/bgm/generator/sampleDirection LambertianInner
+#/gps/particle mu-
+/gps/particle gamma
+/gps/energy 0 MeV
+/bgm/generator/overrideEnergy sources/{SPECTRUM}
+
+/bgm/generator/sampleVolume innerLead  
+#/bgm/generator/sampleVolume p_ancientLeadInside 0 surface
+#/bgm/generator/sampleVolume p_innerLeadInside 0 surface
+/bgm/generator/sampleDirection LambertianInner 
+/gps/ang/type cos
+
+### set up readout
+/bgm/output/writeSteps false
+
+## group output by sensor and decay ancestor
+/bgm/output/addNtuple byiso ancestor copyno
+/bgm/sensitive/ccd/deepCopyNo true
+
+## record flux passing into the innermost layer
+## (turn off if starting from this layer obviously...
+/bgm/tracking/addFluxCounter copperShieldInside
+## If you only want to record flux, can speed up sim by killing 
+## at flux boundeary (useful for quick scan of attenuation
+#/bgm/sensitive/copperShieldInside_flux/killtracks true
+
+## by default, record nothing if there are no hits in active areas
+## if you want to check primary distribution, uncomment below
+/bgm/output/writeAllEvents true
+
+## disable RDecays and primaries if not needed
+/hits/inactivate RDecays
+#/hits/inactivate Primaries
+
+## comment these if starting far from the CCDs to speed up
+/physics_lists/setHiresRegion package
+## some of these commands are redundant with the hires command above
+#/process/em/deexcitationIgnoreCut true
+/process/em/fluo true
+#/process/em/auger true
+#/process/em/augerCascade true
+## pixe can be really slow, watch out:
+#/process/em/pixe true
+#/process/em/deexcitation package 1 1 0
+/process/em/printParameters
+
+#/control/execute vis.mac
+
+#/vis/open HepRepFile
+#/vis/viewer/set/defaultColour white ! ! 0
+#/vis/drawVolume world
+#/vis/scene/add/trajectories
+#/vis/scene/add/hits
+
+## progress verbosity
+#/tracking/verbose 2
+/bgm/printProgress 100000
+### run! 
+/run/beamOn {NPRIMARIES}
+
